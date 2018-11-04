@@ -1,9 +1,4 @@
 from __future__ import print_function
-from subprocess import call
-from pathlib import Path
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import RidgeCV
 import os
 import csv
 import datetime
@@ -12,11 +7,17 @@ import matplotlib.pyplot as plt
 import statsmodels.formula.api as smf
 import statsmodels.api as sm
 import warnings
-#test
+from subprocess import call
+from pathlib import Path
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import RidgeCV
+from sklearn.model_selection import train_test_split
+
 warnings.filterwarnings("ignore")
 
 # Set directory to where data is
-# os.chdir(r'E:\Programming\Data Mining\GitHub Data Mining Project\GWU-Data-Mining-Proposal-1')
+#os.chdir(r'Stock-Modeling')
 
 # Execute script to get new data for today (after reddit web scraping)
 #scall('python process_reddit.py')
@@ -69,13 +70,27 @@ def identify_sig_feature_4_today(y_variable, graph_data):
     # Get the Column Names, Ignore Index
     feat_labels = data.columns[9:19]
 
-    # Start The Random Forest Classifier
-    treereg = RandomForestRegressor(max_depth=11, random_state=1)
+    # Randomly choose 20% of the data for testing; want a large train set (set random_state as 0)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
 
-    # Execute The Data With The Random Forest Classifier
-    treereg.fit(x, y)
+    # Declare the StandardScaler
+    std_scaler = StandardScaler()
 
-    # Get The Important Features From The Classifier
+    # Standardize the features in the training data
+    X_train = std_scaler.fit_transform(X_train)
+
+    # Standardize the features in testing data
+    X_test = std_scaler.transform(X_test)
+
+    # Start The Random Forest Regressor
+    treereg = RandomForestRegressor(n_estimators=100, max_depth=11, random_state=0)
+
+    # Execute The Data With The Random Forest Regressor
+    treereg.fit(X_train, y_train)
+
+    print('The accuracy of the random forest for today sentiment is: ' + str(treereg.score(X_test, y_test)))
+
+    # Get The Important Features From The Regressor
     importances = treereg.feature_importances_
 
     # Sort The Features By The Most Important
@@ -90,7 +105,6 @@ def identify_sig_feature_4_today(y_variable, graph_data):
         importance = importances[indices[f]]
         temp_data = {'Sentiment': sentiment,
                      'Importance': importance}
-        temp_df = pd.DataFrame(temp_data, columns=df_cols, index=[0])
         master_df = master_df.append(temp_data, ignore_index=True)
 
     highest_sentiment = master_df['Sentiment'].iloc[0]
@@ -120,13 +134,27 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
     # Get the Column Names, Ignore Index
     feat_labels = data_tomorrow.columns[9:19]
 
-    # Start The Random Forest Classifier
-    treereg = RandomForestRegressor(max_depth=11, random_state=1)
+    # Randomly choose 20% of the data for testing; want a large train set (set random_state as 1)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
 
-    # Execute The Data With The Random Forest Classifier
-    treereg.fit(x, y)
+    # Declare the StandardScaler
+    std_scaler = StandardScaler()
 
-    # Get The Important Features From The Classifier
+    # Standardize the features in the training data
+    X_train = std_scaler.fit_transform(X_train)
+
+    # Standardize the features in testing data
+    X_test = std_scaler.transform(X_test)
+
+    # Start The Random Forest Regressor
+    treereg = RandomForestRegressor(n_estimators=100, max_depth=11, random_state=1)
+
+    # Execute The Data With The Random Forest Regressor
+    treereg.fit(X_train, y_train)
+
+    print('The accuracy of the random forest for tomorrow sentiment is: ' + str(treereg.score(X_test, y_test)))
+
+    # Get The Important Features From The Regressor
     importances = treereg.feature_importances_
 
     # Sort The Features By The Most Important
@@ -141,7 +169,6 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
         importance = importances[indices[f]]
         temp_data = {'Sentiment': sentiment,
                      'Importance': importance}
-        temp_df = pd.DataFrame(temp_data, columns=df_cols, index=[0])
         master_df = master_df.append(temp_data, ignore_index=True)
 
     highest_sentiment = master_df['Sentiment'].iloc[0]
@@ -161,10 +188,11 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
 
 ########################################################################################################################
 # Local method to correctly retrieve appropriate paramters for Regularized Fit Regression based on Ridge Regression
-def get_fit_regression_params(significant_sentiment, sentiment_value):
+def get_fit_regression_params(significant_sentiment, target_variable, sentiment_value):
     # Define the data needed for this section, and as defined by highest_sentiment
     x = data[significant_sentiment].values.reshape(-1, 1)
-    y = data.High
+
+    y = data[np.unicode(target_variable)].values  # used to be just data.High
 
     # Standardize features
     scaler = StandardScaler()
@@ -180,10 +208,12 @@ def get_fit_regression_params(significant_sentiment, sentiment_value):
                               7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8.0,
                               8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9.0,
                               9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10.0])
+
     # Place x and y variables in the proper format for model_cv.
     y = np.array(y)
     x_std = x_std.reshape((len(y), 1))
     y = y.reshape((len(y), 1))
+
     # Determine the best alpha value to use.
     model_cv = regr_cv.fit(x_std, y)
     alpha_val_today = model_cv.alpha_
@@ -212,7 +242,7 @@ dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
 # set seed
 np.random.seed(1)
 
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment1_today, significant_value1_today)
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment1_today, "Close", significant_value1_today)
 
 # Create a Ordinary Least Squares regression model
 lm1_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
@@ -230,7 +260,7 @@ dta = train_data[['High', 'Open', 'Close', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                   'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment2_today, significant_value2_today)
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment2_today, "High", significant_value2_today)
 
 # Create a Ordinary Least Squares regression model
 lm2_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
@@ -248,7 +278,7 @@ dta = train_data[['Low', 'Open', 'Close', 'High', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                   'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment3_today, significant_value3_today)
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment3_today, "Low", significant_value3_today)
 
 # Create a Ordinary Least Squares regression model
 lm3_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
@@ -275,7 +305,7 @@ dta = train_data_tomorrow[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipatio
 # Set seed again
 np.random.seed(2)
 
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment1_tom, significant_value1_tom)
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment1_tom, "Close", significant_value1_tom)
 
 # Create a Ordinary Least Squares regression model
 lm1_tom = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
@@ -293,7 +323,7 @@ dta = train_data_tomorrow[['High', 'Open', 'Close', 'Low', 'Anger', 'Anticipatio
                            'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                            'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment2_tom, significant_value2_tom)
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment2_tom, "High", significant_value2_tom)
 
 # Create a Ordinary Least Squares regression model
 lm2_tom = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
@@ -311,7 +341,7 @@ dta = train_data_tomorrow[['Low', 'Open', 'Close', 'High', 'Anger', 'Anticipatio
                            'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                            'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment3_tom, significant_value3_tom)
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment3_tom, "Low", significant_value3_tom)
 
 # Create a Ordinary Least Squares regression model
 lm3_tom = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
