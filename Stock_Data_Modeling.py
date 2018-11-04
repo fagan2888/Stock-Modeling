@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import statsmodels.formula.api as smf
 import statsmodels.api as sm
 import warnings
-
+#test
 warnings.filterwarnings("ignore")
 
 # Set directory to where data is
