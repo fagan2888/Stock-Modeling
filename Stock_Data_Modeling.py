@@ -4,6 +4,7 @@ from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import RidgeCV
+from sklearn.model_selection import train_test_split
 import os
 import csv
 import datetime
@@ -16,7 +17,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # Set directory to where data is
-# os.chdir(r'E:\Programming\Data Mining\GitHub Data Mining Project\GWU-Data-Mining-Proposal-1')
+#os.chdir(r'Stock-Modeling')
 
 # Execute script to get new data for today (after reddit web scraping)
 #scall('python process_reddit.py')
@@ -69,11 +70,25 @@ def identify_sig_feature_4_today(y_variable, graph_data):
     # Get the Column Names, Ignore Index
     feat_labels = data.columns[9:19]
 
+    # Randomly choose 20% of the data for testing; want a large train set (set random_state as 0)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=0)
+
+    # Declare the StandardScaler
+    std_scaler = StandardScaler()
+
+    # Standardize the features in the training data
+    X_train = std_scaler.fit_transform(X_train)
+
+    # Standardize the features in testing data
+    X_test = std_scaler.transform(X_test)
+
     # Start The Random Forest Classifier
-    treereg = RandomForestRegressor(max_depth=11, random_state=1)
+    treereg = RandomForestRegressor(n_estimators=100, max_depth=11, random_state=0)
 
     # Execute The Data With The Random Forest Classifier
-    treereg.fit(x, y)
+    treereg.fit(X_train, y_train)
+
+    print('The accuracy of random forest is: ' + str(treereg.score(X_test, y_test)))
 
     # Get The Important Features From The Classifier
     importances = treereg.feature_importances_
@@ -90,7 +105,6 @@ def identify_sig_feature_4_today(y_variable, graph_data):
         importance = importances[indices[f]]
         temp_data = {'Sentiment': sentiment,
                      'Importance': importance}
-        temp_df = pd.DataFrame(temp_data, columns=df_cols, index=[0])
         master_df = master_df.append(temp_data, ignore_index=True)
 
     highest_sentiment = master_df['Sentiment'].iloc[0]
@@ -120,11 +134,25 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
     # Get the Column Names, Ignore Index
     feat_labels = data_tomorrow.columns[9:19]
 
+    # Randomly choose 20% of the data for testing; want a large train set (set random_state as 1)
+    X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+
+    # Declare the StandardScaler
+    std_scaler = StandardScaler()
+
+    # Standardize the features in the training data
+    X_train = std_scaler.fit_transform(X_train)
+
+    # Standardize the features in testing data
+    X_test = std_scaler.transform(X_test)
+
     # Start The Random Forest Classifier
-    treereg = RandomForestRegressor(max_depth=11, random_state=1)
+    treereg = RandomForestRegressor(n_estimators=100, max_depth=11, random_state=1)
 
     # Execute The Data With The Random Forest Classifier
-    treereg.fit(x, y)
+    treereg.fit(X_train, y_train)
+
+    print('The accuracy of random forest is: ' + str(treereg.score(X_test, y_test)))
 
     # Get The Important Features From The Classifier
     importances = treereg.feature_importances_
@@ -141,7 +169,6 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
         importance = importances[indices[f]]
         temp_data = {'Sentiment': sentiment,
                      'Importance': importance}
-        temp_df = pd.DataFrame(temp_data, columns=df_cols, index=[0])
         master_df = master_df.append(temp_data, ignore_index=True)
 
     highest_sentiment = master_df['Sentiment'].iloc[0]
