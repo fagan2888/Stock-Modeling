@@ -1,10 +1,4 @@
 from __future__ import print_function
-from subprocess import call
-from pathlib import Path
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import RidgeCV
-from sklearn.model_selection import train_test_split
 import os
 import csv
 import datetime
@@ -13,7 +7,13 @@ import matplotlib.pyplot as plt
 import statsmodels.formula.api as smf
 import statsmodels.api as sm
 import warnings
-#test
+from subprocess import call
+from pathlib import Path
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.preprocessing import StandardScaler
+from sklearn.linear_model import RidgeCV
+from sklearn.model_selection import train_test_split
+
 warnings.filterwarnings("ignore")
 
 # Set directory to where data is
@@ -82,15 +82,15 @@ def identify_sig_feature_4_today(y_variable, graph_data):
     # Standardize the features in testing data
     X_test = std_scaler.transform(X_test)
 
-    # Start The Random Forest Classifier
+    # Start The Random Forest Regressor
     treereg = RandomForestRegressor(n_estimators=100, max_depth=11, random_state=0)
 
-    # Execute The Data With The Random Forest Classifier
+    # Execute The Data With The Random Forest Regressor
     treereg.fit(X_train, y_train)
 
-    print('The accuracy of random forest is: ' + str(treereg.score(X_test, y_test)))
+    print('The accuracy of the random forest for today sentiment is: ' + str(treereg.score(X_test, y_test)))
 
-    # Get The Important Features From The Classifier
+    # Get The Important Features From The Regressor
     importances = treereg.feature_importances_
 
     # Sort The Features By The Most Important
@@ -146,15 +146,15 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
     # Standardize the features in testing data
     X_test = std_scaler.transform(X_test)
 
-    # Start The Random Forest Classifier
+    # Start The Random Forest Regressor
     treereg = RandomForestRegressor(n_estimators=100, max_depth=11, random_state=1)
 
-    # Execute The Data With The Random Forest Classifier
+    # Execute The Data With The Random Forest Regressor
     treereg.fit(X_train, y_train)
 
-    print('The accuracy of random forest is: ' + str(treereg.score(X_test, y_test)))
+    print('The accuracy of the random forest for tomorrow sentiment is: ' + str(treereg.score(X_test, y_test)))
 
-    # Get The Important Features From The Classifier
+    # Get The Important Features From The Regressor
     importances = treereg.feature_importances_
 
     # Sort The Features By The Most Important
