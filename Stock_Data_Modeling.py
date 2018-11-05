@@ -32,8 +32,11 @@ pd.options.mode.chained_assignment = None
 # **********************************************************************************************************************
 # Modeling / Prepare Data
 
-data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
-data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+#data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+#data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+
+data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA eg.csv')
+data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA eg.csv')
 
 # Move certain columns up by one row for data_tomorrow
 data_tomorrow.Anger = data_tomorrow.Anger.shift(+1)
@@ -289,9 +292,33 @@ fig3.savefig('Today_Low_Regression.png')  # Show Partial regression plot of mode
 # Predicts Low value based on train data and model above
 today_low_prediction = lm3_today.predict(today_record)
 
+#
+highest_sentiment11_today, significant_value11_today = identify_sig_feature_4_today("Close", "False")
+#formula = ('Close ~ Open + High + Low + Cycle_Change + ' + np.unicode(highest_sentiment1_today))
+formula = ('Close ~ Open + High + Low + Cycle_Change' )
+#formula = ('Close ~ Open + High + Low' )
+dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
+                  'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
+                  'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
+
+# set seed
+np.random.seed(1)
+
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment11_today, "Close", significant_value11_today)
+
+# Create a Ordinary Least Squares regression model
+lm11_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+fig11 = plt.figure(figsize=(12, 8))
+fig11 = sm.graphics.plot_partregress_grid(lm11_today, fig=fig11)
+fig11.savefig('Today_Close_Regression.png')  # Show Partial regression plot of model
+
+# Predicts closing value based on train data and model above
+today_close_prediction1 = lm11_today.predict(today_record)
+
 print("The Close value for today's stock is estimated to be: " + str(today_close_prediction.iloc[0]))
 print("The High value for today's stock is estimated to be: " + str(today_high_prediction.iloc[0]))
 print("The Low value for today's stock is estimated to be: " + str(today_low_prediction.iloc[0]))
+print("The Close value for today's stock is estimated to be with news cycle: " + str(today_close_prediction1.iloc[0]))
 print("")
 
 ########################################################################################################################
