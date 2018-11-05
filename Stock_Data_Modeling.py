@@ -294,8 +294,8 @@ today_low_prediction = lm3_today.predict(today_record)
 
 #
 highest_sentiment11_today, significant_value11_today = identify_sig_feature_4_today("Close", "False")
-#formula = ('Close ~ Open + High + Low + Cycle_Change + ' + np.unicode(highest_sentiment1_today))
-formula = ('Close ~ Open + High + Low + Cycle_Change' )
+#formula = ('Close ~ Open + High + Low + C(Cycle_Change) + ' + np.unicode(highest_sentiment1_today))
+formula = ('Close ~ Open + High + Low + C(Cycle_Change)' )
 #formula = ('Close ~ Open + High + Low' )
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
