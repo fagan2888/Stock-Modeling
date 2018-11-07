@@ -12,6 +12,8 @@ from pathlib import Path
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import Perceptron
+from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import train_test_split
 
 warnings.filterwarnings("ignore")
@@ -20,7 +22,7 @@ warnings.filterwarnings("ignore")
 #os.chdir(r'Stock-Modeling')
 
 # Execute script to get new data for today (after reddit web scraping)
-#scall('python process_reddit.py')
+#call('python process_reddit.py')
 import pandas as pd
 
 # Set Console formatting for panda prints
@@ -32,8 +34,13 @@ pd.options.mode.chained_assignment = None
 # **********************************************************************************************************************
 # Modeling / Prepare Data
 
-data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
-data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+os.chdir(r'C:\\Users\\MWilche\\Documents\\Machine Learning I\\Week 2\\Final Project')
+
+#data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+#data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+
+data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA eg.csv')
+data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA eg.csv')
 
 # Move certain columns up by one row for data_tomorrow
 data_tomorrow.Anger = data_tomorrow.Anger.shift(+1)
@@ -230,6 +237,99 @@ def get_fit_regression_params(significant_sentiment, target_variable, sentiment_
 
 
 ########################################################################################################################
+# MODELING EXPLORATION #################################################################################################
+# Testing best model for f(x) = Close ~ Features
+
+# Multi-layer Perceptron Regressor Test
+
+# set seed
+np.random.seed(1)
+
+# Set the MLP
+mlp = MLPRegressor(hidden_layer_sizes=(30, 30, 30))
+
+# Get Feature values
+x = data[['Open', 'High', 'Low', 'Cycle_Change']].values
+
+# Get Target values
+y = data['Close'].values
+
+# Divide into Training/Testing with 20% testing
+X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+
+# Standardize Features
+std_scaler = StandardScaler()
+
+# Standardize the training data
+X_train = std_scaler.fit_transform(X_train)
+
+# Standardize the testing data
+X_test = std_scaler.transform(X_test)
+
+# Train the model
+mlp.fit(X_train, y_train)
+
+# Print the accuracy
+print('Multi-layer Perceptron Regressor Accuracy: ' + str(mlp.score(X_test, y_test)))
+
+# Predict on Today's Closing Value
+mlp_predict_record = today_record[['Open', 'High', 'Low', 'Cycle_Change']].values
+mlp_today_close_prediction = mlp.predict(mlp_predict_record)
+
+#**********************************************************************************************#
+# Single Perceptron Test
+
+# set seed
+np.random.seed(2)
+
+# Set the Perceptron with -1 n_jobs to utilize all processors of the CPU
+sklearn_perceptron = Perceptron(n_jobs=-1)
+
+# Use same test/train data from above
+
+# Train the model
+sklearn_perceptron.fit(X_train, y_train)
+
+# Print the accuracy
+print('Perceptron Accuracy: ' + str(sklearn_perceptron.score(X_test, y_test)))
+
+# Predict on Today's Closing Value
+perc_today_close_prediction = sklearn_perceptron.predict(mlp_predict_record)
+
+#**********************************************************************************************#
+# OLS Regression Test
+
+# Define formula string for Stats-model API
+formula = 'Close ~ Open + High + Low + Cycle_Change'
+
+# Define Training Data
+dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
+                  'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
+                  'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
+
+# Set the Model
+ols_today_close_model = smf.ols(formula=formula, data=dta)
+
+# Predict on Today's Closing Value
+ols_today_close_prediction = ols_today_close_model.predict(mlp_predict_record)
+
+# Show Model
+fig1 = plt.figure(figsize=(12, 8))
+fig1 = sm.graphics.plot_partregress_grid(ols_today_close_model, fig=fig1)
+
+# Update Model with Regularized Fit to prevent over-fitting
+olsUpdate_today_close_prediction = ols_today_close_model.predict(today_record).fit_regularized()
+
+# Predict on Today's Closing Value with Revised OLS Model
+olsUpdate_today_close_prediction = olsUpdate_today_close_prediction.predict(today_record)
+
+# Show Updated Model
+fig2 = plt.figure(figsize=(12, 8))
+fig2 = sm.graphics.plot_partregress_grid(olsUpdate_today_close_prediction, fig=fig2)
+
+# OLS may be the best model; let's tune it
+
+########################################################################################################################
 # MODELING 4 TODAY #####################################################################################################
 # Prepare formula to predict closing of stock data for today
 
@@ -289,9 +389,33 @@ fig3.savefig('Today_Low_Regression.png')  # Show Partial regression plot of mode
 # Predicts Low value based on train data and model above
 today_low_prediction = lm3_today.predict(today_record)
 
+#
+highest_sentiment11_today, significant_value11_today = identify_sig_feature_4_today("Close", "False")
+#formula = ('Close ~ Open + High + Low + C(Cycle_Change) + ' + np.unicode(highest_sentiment1_today))
+formula = ('Close ~ Open + High + Low + C(Cycle_Change)' )
+#formula = ('Close ~ Open + High + Low' )
+dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
+                  'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
+                  'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
+
+# set seed
+np.random.seed(1)
+
+alpha_val, weight_val = get_fit_regression_params(highest_sentiment11_today, "Close", significant_value11_today)
+
+# Create a Ordinary Least Squares regression model
+lm11_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+fig11 = plt.figure(figsize=(12, 8))
+fig11 = sm.graphics.plot_partregress_grid(lm11_today, fig=fig11)
+fig11.savefig('Today_Close_Regression.png')  # Show Partial regression plot of model
+
+# Predicts closing value based on train data and model above
+today_close_prediction1 = lm11_today.predict(today_record)
+
 print("The Close value for today's stock is estimated to be: " + str(today_close_prediction.iloc[0]))
 print("The High value for today's stock is estimated to be: " + str(today_high_prediction.iloc[0]))
 print("The Low value for today's stock is estimated to be: " + str(today_low_prediction.iloc[0]))
+print("The Close value for today's stock is estimated to be with news cycle: " + str(today_close_prediction1.iloc[0]))
 print("")
 
 ########################################################################################################################
