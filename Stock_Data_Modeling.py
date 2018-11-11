@@ -9,12 +9,16 @@ import statsmodels.api as sm
 import warnings
 from subprocess import call
 from pathlib import Path
+from sklearn.pipeline import Pipeline
+from sklearn.svm import SVR
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.linear_model import RidgeCV
-from sklearn.linear_model import Perceptron
+from sklearn.linear_model import RidgeCV, LinearRegression
 from sklearn.neural_network import MLPRegressor
+from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
+
 
 warnings.filterwarnings("ignore")
 
@@ -34,7 +38,7 @@ pd.options.mode.chained_assignment = None
 # **********************************************************************************************************************
 # Modeling / Prepare Data
 
-os.chdir(r'C:\\Users\\MWilche\\Documents\\Machine Learning I\\Week 2\\Final Project')
+os.chdir(r'Stock-Modeling')
 
 #data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
 #data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
@@ -240,61 +244,102 @@ def get_fit_regression_params(significant_sentiment, target_variable, sentiment_
 # MODELING EXPLORATION #################################################################################################
 # Testing best model for f(x) = Close ~ Features
 
-# Multi-layer Perceptron Regressor Test
-
-# set seed
-np.random.seed(1)
-
-# Set the MLP
-mlp = MLPRegressor(hidden_layer_sizes=(30, 30, 30))
-
 # Get Feature values
 x = data[['Open', 'High', 'Low', 'Cycle_Change']].values
 
 # Get Target values
 y = data['Close'].values
 
-# Divide into Training/Testing with 20% testing
-X_train, X_test, y_train, y_test = train_test_split(x, y, test_size=0.2, random_state=1)
+regression_models = {'lr': LinearRegression(n_jobs=-1),
+                     'mlp': MLPRegressor(random_state=0),
+                     'dt': DecisionTreeRegressor(random_state=0),
+                     'rf': RandomForestRegressor(random_state=0, n_jobs=-1),
+                     'svr': SVR(max_iter=-1)}
 
-# Standardize Features
-std_scaler = StandardScaler()
+pipe_regrs = {}
 
-# Standardize the training data
-X_train = std_scaler.fit_transform(X_train)
+# Create list of pipeline models to test with that standardize the data
+for name, regression_models in regression_models.items():
+    pipe_regrs[name] = Pipeline([('StandardScaler', StandardScaler()), ('regr', regression_models)])
 
-# Standardize the testing data
-X_test = std_scaler.transform(X_test)
+param_grids = {}
 
-# Train the model
-mlp.fit(X_train, y_train)
+# Linear Regression Parameter Options:
+param_grid = [{'regr__normalize': ['True']},
+              {'regr__normalize': ['False']}]
 
-# Print the accuracy
-print('Multi-layer Perceptron Regressor Accuracy: ' + str(mlp.score(X_test, y_test)))
+# Add Linear Regression Parameters to dictionary grid
+param_grids['lr'] = param_grid
 
-# Predict on Today's Closing Value
-mlp_predict_record = today_record[['Open', 'High', 'Low', 'Cycle_Change']].values
-mlp_today_close_prediction = mlp.predict(mlp_predict_record)
+# MLP Parameter Options:
+alpha_range = [10 ** i for i in range(-4, 5)]
 
-#**********************************************************************************************#
-# Single Perceptron Test
+param_grid = [{'regr__hidden_layer_sizes': [10, 100, 200],
+               'regr__activation': ['identity', 'logistic', 'tanh', 'relu'],
+               'regr__solver': ['lbfgs', 'sgd', 'adam'],
+               'regr__alpha': alpha_range},
+              {'regr__hidden_layer_sizes': [30, 30, 30],
+               'regr__activation': ['identity', 'logistic', 'tanh', 'relu'],
+               'regr__solver': ['lbfgs', 'sgd', 'adam'],
+               'regr__alpha': alpha_range}]
 
-# set seed
-np.random.seed(2)
+# Add Multi-layer Perceptron Parameters to dictionary grid
+param_grids['mlp'] = param_grid
 
-# Set the Perceptron with -1 n_jobs to utilize all processors of the CPU
-sklearn_perceptron = Perceptron(n_jobs=-1)
+# Decision Tree Regression Parameter Options:
+param_grid = [{'regr__criterion': ['mse', 'friedman_mse', 'mae'],
+               'regr__min_samples_split': [2, 6, 10, 20, 30, 40, 50],
+               'regr__min_samples_leaf': [1, 6, 10, 20, 30, 40, 50],
+               'regr__max_features': ['auto', 'int', 'float', 'sqrt', 'log2']}]
 
-# Use same test/train data from above
+# Add Decision Tree Parameters to dictionary grid
+param_grids['dt'] = param_grid
 
-# Train the model
-sklearn_perceptron.fit(X_train, y_train)
+# Random Forest Regression Parameter Options:
+param_grid = [{'regr__n_estimators': [10, 100, 1000],
+               'regr__criterion': ['mse', 'mae'],
+               'regr__min_samples_split': [2, 6, 10, 20, 30, 40, 50],
+               'regr__min_samples_leaf': [1, 6, 10, 20, 30, 40, 50],
+               'regr__max_features': ['auto', 'int', 'float', 'sqrt', 'log2']}]
 
-# Print the accuracy
-print('Perceptron Accuracy: ' + str(sklearn_perceptron.score(X_test, y_test)))
+# Add Random Forest Parameters to dictionary grid
+param_grids['rf'] = param_grid
 
-# Predict on Today's Closing Value
-perc_today_close_prediction = sklearn_perceptron.predict(mlp_predict_record)
+# Support Vector Machine (SVM) Parameter Options:
+param_grid = [{'regr__C': [0.01, 0.1, 1, 10, 100],
+               'regr__gamma': [0.01, 0.1, 1, 10, 100],
+               'regr__kernel': ['linear', 'poly', 'rbf', 'sigmoid']}]
+
+# Add SVM Parameters to dictionary grid
+param_grids['svr'] = param_grid
+
+# The list of [best_score_, best_params_, best_estimator_]
+best_score_param_estimators = []
+
+# For each regression
+for name in pipe_regrs.keys():
+    # GridSearchCV
+    gs = GridSearchCV(estimator=pipe_regrs[name],
+                      param_grid=param_grids[name],
+                      scoring='accuracy',
+                      n_jobs=1,
+                      cv=None)
+
+    # Fit the pipeline
+    gs = gs.fit(x, y)
+
+    # Update best_score_param_estimators
+    best_score_param_estimators.append([gs.best_score_, gs.best_params_, gs.best_estimator_])
+
+# Sort best_score_param_estimators in descending order of the best_score_
+best_score_param_estimators = sorted(best_score_param_estimators, key=lambda x: x[0], reverse=True)
+
+# For each [best_score_, best_params_, best_estimator_]
+for best_score_param_estimator in best_score_param_estimators:
+    # Print out [best_score_, best_params_, best_estimator_], where best_estimator_ is a pipeline
+    # Since we only print out the type of classifier of the pipeline
+    print([best_score_param_estimator[0], best_score_param_estimator[1], type(best_score_param_estimator[2].named_steps['regr'])], end='\n\n')
+
 
 #**********************************************************************************************#
 # OLS Regression Test
@@ -308,20 +353,14 @@ dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
 
 # Set the Model
-ols_today_close_model = smf.ols(formula=formula, data=dta)
-
-# Predict on Today's Closing Value
-ols_today_close_prediction = ols_today_close_model.predict(mlp_predict_record)
-
-# Show Model
-fig1 = plt.figure(figsize=(12, 8))
-fig1 = sm.graphics.plot_partregress_grid(ols_today_close_model, fig=fig1)
+ols_today_close_model = smf.ols(formula=formula, data=dta).fit()
+print(ols_today_close_model.summary())  # shows R-Squared and Adj. R Squared equals 1; thus model is overfitted
 
 # Update Model with Regularized Fit to prevent over-fitting
-olsUpdate_today_close_prediction = ols_today_close_model.predict(today_record).fit_regularized()
+olsUpdate_today_close = smf.ols(formula=formula, data=dta).fit_regularized(alpha=10, L1_wt=.6)
+print(olsUpdate_today_close.summary())  # library issue that does not print regularized models
 
-# Predict on Today's Closing Value with Revised OLS Model
-olsUpdate_today_close_prediction = olsUpdate_today_close_prediction.predict(today_record)
+olsUpdate_today_close_prediction = olsUpdate_today_close.predict(today_record)
 
 # Show Updated Model
 fig2 = plt.figure(figsize=(12, 8))
