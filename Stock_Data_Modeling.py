@@ -316,6 +316,7 @@ param_grids['svr'] = param_grid
 # The list of [best_score_, best_params_, best_estimator_]
 best_score_param_estimators = []
 
+# Scoring Param: https://scikit-learn.org/stable/modules/model_evaluation.html#scoring-parameter
 # For each regression
 for name in pipe_regrs.keys():
     # GridSearchCV
