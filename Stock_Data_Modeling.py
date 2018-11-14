@@ -321,7 +321,7 @@ for name in pipe_regrs.keys():
     # GridSearchCV
     gs = GridSearchCV(estimator=pipe_regrs[name],
                       param_grid=param_grids[name],
-                      scoring='accuracy',
+                      scoring='neg_mean_squared_error',
                       n_jobs=1,
                       cv=None)
 
