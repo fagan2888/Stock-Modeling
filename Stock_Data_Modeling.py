@@ -276,11 +276,7 @@ alpha_range = [10 ** i for i in range(-4, 5)]
 
 param_grid = [{'regr__hidden_layer_sizes': [10, 100, 200],
                'regr__activation': ['identity', 'logistic', 'tanh', 'relu'],
-               'regr__solver': ['lbfgs', 'sgd', 'adam'],
-               'regr__alpha': alpha_range},
-              {'regr__hidden_layer_sizes': [30, 30, 30],
-               'regr__activation': ['identity', 'logistic', 'tanh', 'relu'],
-               'regr__solver': ['lbfgs', 'sgd', 'adam'],
+               'regr__solver': ['lbfgs', 'adam'],
                'regr__alpha': alpha_range}]
 
 # Add Multi-layer Perceptron Parameters to dictionary grid
@@ -290,17 +286,17 @@ param_grids['mlp'] = param_grid
 param_grid = [{'regr__criterion': ['mse', 'friedman_mse', 'mae'],
                'regr__min_samples_split': [2, 6, 10, 20, 30, 40, 50],
                'regr__min_samples_leaf': [1, 6, 10, 20, 30, 40, 50],
-               'regr__max_features': ['auto', 'int', 'float', 'sqrt', 'log2']}]
+               'regr__max_features': ['auto', 'sqrt', 'log2']}]
 
 # Add Decision Tree Parameters to dictionary grid
 param_grids['dt'] = param_grid
 
 # Random Forest Regression Parameter Options:
-param_grid = [{'regr__n_estimators': [10, 100, 1000],
+param_grid = [{'regr__n_estimators': [10, 100],
                'regr__criterion': ['mse', 'mae'],
                'regr__min_samples_split': [2, 6, 10, 20, 30, 40, 50],
                'regr__min_samples_leaf': [1, 6, 10, 20, 30, 40, 50],
-               'regr__max_features': ['auto', 'int', 'float', 'sqrt', 'log2']}]
+               'regr__max_features': ['auto', 'sqrt', 'log2']}]
 
 # Add Random Forest Parameters to dictionary grid
 param_grids['rf'] = param_grid
