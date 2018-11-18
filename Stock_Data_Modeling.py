@@ -19,14 +19,13 @@ from sklearn.neural_network import MLPRegressor
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 
-
 warnings.filterwarnings("ignore")
 
 # Set directory to where data is
-#os.chdir(r'Stock-Modeling')
+# os.chdir(r'Stock-Modeling')
 
 # Execute script to get new data for today (after reddit web scraping)
-#call('python process_reddit.py')
+# call('python process_reddit.py')
 import pandas as pd
 
 # Set Console formatting for panda prints
@@ -37,14 +36,11 @@ pd.options.mode.chained_assignment = None
 
 # **********************************************************************************************************************
 # Modeling / Prepare Data
+# data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+# data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
 
-os.chdir(r'Stock-Modeling')
-
-#data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
-#data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
-
-data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA eg.csv')
-data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA eg.csv')
+data = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA%20eg.csv')
+data_tomorrow = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA%20eg.csv')
 
 # Move certain columns up by one row for data_tomorrow
 data_tomorrow.Anger = data_tomorrow.Anger.shift(+1)
@@ -241,6 +237,16 @@ def get_fit_regression_params(significant_sentiment, target_variable, sentiment_
 
 
 ########################################################################################################################
+# Local method to get Margin of Error
+def get_change(current, previous):
+    if current == previous:
+        return 100.0
+    try:
+        return (abs(current - previous) / previous) * 100.0
+    except ZeroDivisionError:
+        return 0
+
+########################################################################################################################
 # MODELING EXPLORATION #################################################################################################
 # Testing best model for f(x) = Close ~ Features
 
@@ -274,18 +280,15 @@ param_grids['lr'] = param_grid
 # MLP Parameter Options:
 alpha_range = [10 ** i for i in range(-4, 5)]
 
-param_grid = [{'regr__hidden_layer_sizes': [10, 100, 200],
-               'regr__activation': ['identity', 'logistic', 'tanh', 'relu'],
-               'regr__solver': ['lbfgs', 'adam'],
-               'regr__alpha': alpha_range}]
+param_grid = [{'regr__hidden_layer_sizes': [10, 100, 200]}]
 
 # Add Multi-layer Perceptron Parameters to dictionary grid
 param_grids['mlp'] = param_grid
 
 # Decision Tree Regression Parameter Options:
-param_grid = [{'regr__criterion': ['mse', 'friedman_mse', 'mae'],
-               'regr__min_samples_split': [2, 6, 10, 20, 30, 40, 50],
-               'regr__min_samples_leaf': [1, 6, 10, 20, 30, 40, 50],
+param_grid = [{'regr__criterion': ['mse', 'mae'],
+               'regr__min_samples_split': [2, 6, 10],
+               'regr__min_samples_leaf': [1, 6, 10],
                'regr__max_features': ['auto', 'sqrt', 'log2']}]
 
 # Add Decision Tree Parameters to dictionary grid
@@ -294,16 +297,16 @@ param_grids['dt'] = param_grid
 # Random Forest Regression Parameter Options:
 param_grid = [{'regr__n_estimators': [10, 100],
                'regr__criterion': ['mse', 'mae'],
-               'regr__min_samples_split': [2, 6, 10, 20, 30, 40, 50],
-               'regr__min_samples_leaf': [1, 6, 10, 20, 30, 40, 50],
+               'regr__min_samples_split': [2, 6, 10],
+               'regr__min_samples_leaf': [1, 6, 10],
                'regr__max_features': ['auto', 'sqrt', 'log2']}]
 
 # Add Random Forest Parameters to dictionary grid
 param_grids['rf'] = param_grid
 
 # Support Vector Machine (SVM) Parameter Options:
-param_grid = [{'regr__C': [0.01, 0.1, 1, 10, 100],
-               'regr__gamma': [0.01, 0.1, 1, 10, 100],
+param_grid = [{'regr__C': [0.1, 1, 10],
+               'regr__gamma': [0.1, 1, 10],
                'regr__kernel': ['linear', 'poly', 'rbf', 'sigmoid']}]
 
 # Add SVM Parameters to dictionary grid
@@ -321,12 +324,13 @@ for name in pipe_regrs.keys():
                       scoring='neg_mean_squared_error',
                       n_jobs=1,
                       cv=None)
-
+    print("Modeling: " + str(pipe_regrs[name]))
     # Fit the pipeline
     gs = gs.fit(x, y)
 
     # Update best_score_param_estimators
     best_score_param_estimators.append([gs.best_score_, gs.best_params_, gs.best_estimator_])
+    print("Modeling Completed - Appending scores...")
 
 # Sort best_score_param_estimators in descending order of the best_score_
 best_score_param_estimators = sorted(best_score_param_estimators, key=lambda x: x[0], reverse=True)
@@ -335,10 +339,20 @@ best_score_param_estimators = sorted(best_score_param_estimators, key=lambda x: 
 for best_score_param_estimator in best_score_param_estimators:
     # Print out [best_score_, best_params_, best_estimator_], where best_estimator_ is a pipeline
     # Since we only print out the type of classifier of the pipeline
-    print([best_score_param_estimator[0], best_score_param_estimator[1], type(best_score_param_estimator[2].named_steps['regr'])], end='\n\n')
+    print([best_score_param_estimator[0], best_score_param_estimator[1],
+           type(best_score_param_estimator[2].named_steps['regr'])], end='\n\n')
 
+# Best Model from Grid Search was Linear Regression Normalize is True
+lr = LinearRegression(n_jobs=-1)
 
-#**********************************************************************************************#
+lr = lr.fit(x, y)
+today_close = today_record[['Open', 'High', 'Low', 'Cycle_Change']].values
+y_pred = lr.predict(today_close)
+
+error = get_change(y_pred[0], today_record['Close'].values[0])
+print("Accuracy error for prediction: " + str(round(error, 4)) + "%")
+
+# **********************************************************************************************#
 # OLS Regression Test
 
 # Define formula string for Stats-model API
@@ -427,9 +441,9 @@ today_low_prediction = lm3_today.predict(today_record)
 
 #
 highest_sentiment11_today, significant_value11_today = identify_sig_feature_4_today("Close", "False")
-#formula = ('Close ~ Open + High + Low + C(Cycle_Change) + ' + np.unicode(highest_sentiment1_today))
-formula = ('Close ~ Open + High + Low + C(Cycle_Change)' )
-#formula = ('Close ~ Open + High + Low' )
+# formula = ('Close ~ Open + High + Low + C(Cycle_Change) + ' + np.unicode(highest_sentiment1_today))
+formula = ('Close ~ Open + High + Low + C(Cycle_Change)')
+# formula = ('Close ~ Open + High + Low' )
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                   'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
