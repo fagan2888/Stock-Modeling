@@ -38,8 +38,6 @@ pd.options.mode.chained_assignment = None
 # Modeling / Prepare Data
 data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
 data['Cycle_Change'] = data.Max_Sentiment.eq(data.Max_Sentiment.shift())
-dummies = pd.get_dummies(data.Cycle_Change)
-data.join(dummies)
 # data_tomorrow = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
 
 data = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA%20eg.csv')
