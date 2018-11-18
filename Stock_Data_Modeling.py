@@ -21,9 +21,6 @@ from sklearn.model_selection import train_test_split
 
 warnings.filterwarnings("ignore")
 
-# Set directory to where data is
-# os.chdir(r'Stock-Modeling')
-
 # Execute script to get new data for today (after reddit web scraping)
 # call('python process_reddit.py')
 import pandas as pd
@@ -36,15 +33,11 @@ pd.options.mode.chained_assignment = None
 
 # **********************************************************************************************************************
 # Modeling / Prepare Data
-data = pd.read_csv('DJ_NEWS_SENTIMENT_DATA.csv')
+data = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA.csv')
 data['Cycle_Change'] = data.Max_Sentiment.eq(data.Max_Sentiment.shift())
 dummies = pd.get_dummies(data.Cycle_Change)
 data.join(dummies)
-
 data_tomorrow = data
-
-data = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA%20eg.csv')
-data_tomorrow = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA%20eg.csv')
 
 # Move certain columns up by one row for data_tomorrow
 data_tomorrow.Anger = data_tomorrow.Anger.shift(+1)
@@ -255,7 +248,7 @@ def get_change(current, previous):
 # Testing best model for f(x) = Close ~ Features
 
 # Get Feature values
-x = data[['Open', 'High', 'Low', 'Cycle_Change']].values
+x = data[['Open', 'High', 'Low', 'False', 'True']].values
 
 # Get Target values
 y = data['Close'].values
@@ -350,7 +343,7 @@ for best_score_param_estimator in best_score_param_estimators:
 lr = LinearRegression(n_jobs=-1)
 
 lr = lr.fit(x, y)
-today_close = today_record[['Open', 'High', 'Low', 'Cycle_Change']].values
+today_close = today_record[['Open', 'High', 'Low', 'False', 'True']].values
 y_pred = lr.predict(today_close)
 
 error = get_change(y_pred[0], today_record['Close'].values[0])
@@ -360,7 +353,7 @@ print("Accuracy error for prediction: " + str(round(error, 4)) + "%")
 # OLS Regression Test
 
 # Define formula string for Stats-model API
-formula = 'Close ~ Open + High + Low + Cycle_Change'
+formula = 'Close ~ Open + High + Low + False + True'
 
 # Define Training Data
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
@@ -378,8 +371,8 @@ print(olsUpdate_today_close.summary())  # library issue that does not print regu
 olsUpdate_today_close_prediction = olsUpdate_today_close.predict(today_record)
 
 # Show Updated Model
-fig2 = plt.figure(figsize=(12, 8))
-fig2 = sm.graphics.plot_partregress_grid(olsUpdate_today_close_prediction, fig=fig2)
+fig = plt.figure(figsize=(12, 8))
+fig = sm.graphics.plot_partregress_grid(olsUpdate_today_close_prediction, fig=fig)
 
 # OLS may be the best model; let's tune it
 
