@@ -36,7 +36,7 @@ pd.options.mode.chained_assignment = None
 data = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA.csv')
 data['Cycle_Change'] = data.Max_Sentiment.eq(data.Max_Sentiment.shift())
 dummies = pd.get_dummies(data.Cycle_Change)
-data.join(dummies)
+data= data.join(dummies)
 data_tomorrow = data
 
 # Move certain columns up by one row for data_tomorrow
@@ -358,7 +358,7 @@ formula = 'Close ~ Open + High + Low + False + True'
 # Define Training Data
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
-                  'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
+                  'Trust', 'Negative', 'Positive', 'False', 'Sentiment_Proportion']].copy()
 
 # Set the Model
 ols_today_close_model = smf.ols(formula=formula, data=dta).fit()
@@ -439,11 +439,11 @@ today_low_prediction = lm3_today.predict(today_record)
 #
 highest_sentiment11_today, significant_value11_today = identify_sig_feature_4_today("Close", "False")
 # formula = ('Close ~ Open + High + Low + C(Cycle_Change) + ' + np.unicode(highest_sentiment1_today))
-formula = ('Close ~ Open + High + Low + C(Cycle_Change)')
+formula = ('Close ~ Open + High + Low + C(False)')
 # formula = ('Close ~ Open + High + Low' )
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
-                  'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
+                  'Trust', 'Negative', 'Positive', 'False', 'Sentiment_Proportion']].copy()
 
 # set seed
 np.random.seed(1)
