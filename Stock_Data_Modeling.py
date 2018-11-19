@@ -358,7 +358,7 @@ formula = 'Close ~ Open + High + Low + Cycle_Change'
 # Define Training Data
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
-                  'Trust', 'Negative', 'Positive', 'Cycle_Change', False, True,'Sentiment_Proportion']].copy()
+                  'Trust', 'Negative', 'Positive', 'Cycle_Change', False, True, 'Sentiment_Proportion']].copy()
 
 # Set the Model
 ols_today_close_model = smf.ols(formula=formula, data=dta).fit()
