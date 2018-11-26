@@ -53,7 +53,7 @@ new_djia_data = new_djia_data.tail(1)
 import pandas as pd
 
 # set directory where scripts are
-os.chdir(r'E:\Programming\Data Mining\GitHub Data Mining Project\GWU-Data-Mining-Proposal-1')
+os.chdir(r'E:\Programming\Data Science\')
 
 dir_name = os.getcwd() + r'\reddit_data\worldnews'  # change to where the reddit files are
 data_path = os.listdir(dir_name)
@@ -79,8 +79,7 @@ shutil.rmtree(dir_name)  # removes all the files collected from the reddit web s
 ########################################################################################################################
 # run R script and return new_sentiment_data.csv
 # NOTE: param1 = path to Rscript.exe from the R build, param2 is the path to the R file to execute
-call(["C:/Users/Matt Wilchek/Documents/R/R-3.4.3/bin/Rscript",
-      "E:/Programming/Data Mining/GitHub Data Mining Project/GWU-Data-Mining-Proposal-1/sentiment_extraction.r"])
+call(["C:/Users/Matt Wilchek/Documents/R/R-3.4.3/bin/Rscript", "E:/Programming/Data Science/sentiment_extraction.r"])
 # E:/Programming/Data Mining/GitHub Data Mining Project/GWU-Data-Mining-Proposal-1/sentiment_extraction.r
 sentiment = pd.read_csv("new_sentiment_data.csv")
 sentiment.drop('Unnamed: 0', axis=1, inplace=True)
