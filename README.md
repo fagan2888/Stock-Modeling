@@ -1,6 +1,6 @@
 # Predicting the Stock Market
 
-This is a repo for Data Mining and Predicting stock market data with sentiment data on related news.
+This is a repo for Predicting stock market data using machine learning with sentiment data on related news.
 Below are the steps in order to run models:
 
 ## Step 1: Web Scrape News Data with Reddit Data Extractor
