@@ -8,6 +8,7 @@ import statsmodels.formula.api as smf
 import statsmodels.api as sm
 import warnings
 from subprocess import call
+from datetime import datetime, timedelta
 from pathlib import Path
 from sklearn.pipeline import Pipeline
 from sklearn.svm import SVR
@@ -22,7 +23,7 @@ from sklearn.model_selection import train_test_split
 warnings.filterwarnings("ignore")
 
 # Execute script to get new data for today (after reddit web scraping)
-# call('python process_reddit.py')
+call('python process_reddit.py')
 import pandas as pd
 
 # Set Console formatting for panda prints
@@ -37,7 +38,7 @@ data = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/ma
 data['Cycle_Change'] = data.Max_Sentiment.eq(data.Max_Sentiment.shift())
 dummies = pd.get_dummies(data.Cycle_Change)
 data = data.join(dummies)
-data_tomorrow = data
+data_tomorrow = pd.read_csv('https://raw.githubusercontent.com/mwilchek/Stock-Modeling/master/DJ_NEWS_SENTIMENT_DATA.csv')
 
 # Move certain columns up by one row for data_tomorrow
 data_tomorrow.Anger = data_tomorrow.Anger.shift(+1)
@@ -58,20 +59,29 @@ data_tomorrow.drop(data_tomorrow.head(1).index, inplace=True)
 
 train_data = data[:-1]  # train data
 today_record = data.tail(1)  # test data (validate current day and predict from following day)
+
+# Get train data's most recent date of data
+train_date_to = today_record['Date'].values
+train_date_to = datetime.strptime(train_date_to[0], '%m/%d/%Y') - timedelta(days=1)
+train_date_to = train_date_to.strftime("%m/%d/%Y")
+
 train_data_tomorrow = data_tomorrow[:-1]  # train data
 tomorrow_record = data_tomorrow.tail(1)  # test data (validate current day and predict from following day)
+data.tail(n=5)
 
 
 ########################################################################################################################
 # TODAY: Local method to identify most significant feature in dataset compared to y
 def identify_sig_feature_4_today(y_variable, graph_data):
+    warnings.filterwarnings("ignore")
+
     # Split Data Into X, which are ALL the features
     x = data.iloc[:, 9:18].values
 
     # Split Data Into y, which are the associated targets/classifications; looking at Volume
     y = data[np.unicode(y_variable)].values
 
-    # Get the Column Names, Ignore Index
+    # Get the Column Names for Sentiment, Ignore Index
     feat_labels = data.columns[9:19]
 
     # Randomly choose 20% of the data for testing; want a large train set (set random_state as 0)
@@ -92,7 +102,8 @@ def identify_sig_feature_4_today(y_variable, graph_data):
     # Execute The Data With The Random Forest Regressor
     treereg.fit(X_train, y_train)
 
-    print('The accuracy of the random forest for today sentiment is: ' + str(treereg.score(X_test, y_test)))
+    print('The ' + str(y_variable) + ' accuracy of the random forest for today sentiment is: ' + str(
+        treereg.score(X_test, y_test)))
 
     # Get The Important Features From The Regressor
     importances = treereg.feature_importances_
@@ -129,13 +140,15 @@ def identify_sig_feature_4_today(y_variable, graph_data):
 ########################################################################################################################
 # TOMORROW: Local method to identify most significant feature in dataset compared to y
 def identify_sig_feature_4_tomorrow(y_variable, graph_data):
+    warnings.filterwarnings("ignore")
+
     # Split Data Into X, which are ALL the features
     x = data_tomorrow.iloc[:, 9:18].values
 
     # Split Data Into y, which are the associated targets/classifications; looking at Volume
     y = data_tomorrow[np.unicode(y_variable)].values
 
-    # Get the Column Names, Ignore Index
+    # Get the Column Names for Sentiment, Ignore Index
     feat_labels = data_tomorrow.columns[9:19]
 
     # Randomly choose 20% of the data for testing; want a large train set (set random_state as 1)
@@ -156,7 +169,8 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
     # Execute The Data With The Random Forest Regressor
     treereg.fit(X_train, y_train)
 
-    print('The accuracy of the random forest for tomorrow sentiment is: ' + str(treereg.score(X_test, y_test)))
+    print('The ' + str(y_variable) + ' accuracy of the random forest for tomorrow sentiment is: ' + str(
+        treereg.score(X_test, y_test)))
 
     # Get The Important Features From The Regressor
     importances = treereg.feature_importances_
@@ -193,6 +207,8 @@ def identify_sig_feature_4_tomorrow(y_variable, graph_data):
 ########################################################################################################################
 # Local method to correctly retrieve appropriate paramters for Regularized Fit Regression based on Ridge Regression
 def get_fit_regression_params(significant_sentiment, target_variable, sentiment_value):
+    warnings.filterwarnings("ignore")
+
     # Define the data needed for this section, and as defined by highest_sentiment
     x = data[significant_sentiment].values.reshape(-1, 1)
 
@@ -201,6 +217,7 @@ def get_fit_regression_params(significant_sentiment, target_variable, sentiment_
     # Standardize features
     scaler = StandardScaler()
     x_std = scaler.fit_transform(x)
+
     # Create ridge regression with alpha values from .1 to 10.0, in increments of 0.1
     regr_cv = RidgeCV(alphas=[0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0,
                               1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0,
@@ -268,8 +285,8 @@ for name, regression_models in regression_models.items():
 param_grids = {}
 
 # Linear Regression Parameter Options:
-param_grid = [{'regr__normalize': [True]},
-              {'regr__normalize': [False]}]
+param_grid = [{'regr__normalize': ["True"]},
+              {'regr__normalize': ["False"]}]
 
 # Add Linear Regression Parameters to dictionary grid
 param_grids['lr'] = param_grid
@@ -339,12 +356,37 @@ for best_score_param_estimator in best_score_param_estimators:
     print([best_score_param_estimator[0], best_score_param_estimator[1],
            type(best_score_param_estimator[2].named_steps['regr'])], end='\n\n')
 
-# Best Model from Grid Search was Linear Regression Normalize is True
+# Declare best model from GridSearchCV where normalize set to True is the default parameter
 lr = LinearRegression(n_jobs=-1)
 
+# Fit the model with our data
 lr = lr.fit(x, y)
+
+# Predict on Today Close
 today_close = today_record[['Open', 'High', 'Low', False, True]].values
 y_pred = lr.predict(today_close)
+
+# Print Results
+print("Actual Closing Value: " + str(today_record['Close'].values[0]))
+print("Predicted Closing Value: " + str(y_pred[0]))
+
+error = get_change(y_pred[0], today_record['Close'].values[0])
+print("Accuracy error for prediction: " + str(round(error, 4)) + "%")
+
+#SVR case
+# Declare best model from GridSearchCV where normalize set to True is the default parameter
+sv = SVR()
+
+# Fit the model with our data
+sv = sv.fit(x, y)
+
+# Predict on Today Close
+today_close = today_record[['Open', 'High', 'Low', False, True]].values
+y_pred = sv.predict(today_close)
+
+# Print Results
+print("Actual Closing Value: " + str(today_record['Close'].values[0]))
+print("Predicted Closing Value: " + str(y_pred[0]))
 
 error = get_change(y_pred[0], today_record['Close'].values[0])
 print("Accuracy error for prediction: " + str(round(error, 4)) + "%")
@@ -358,167 +400,214 @@ formula = 'Close ~ Open + High + Low + Cycle_Change'
 # Define Training Data
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
-                  'Trust', 'Negative', 'Positive', 'Cycle_Change', False, True, 'Sentiment_Proportion']].copy()
+                  'Trust', 'Negative', 'Positive', 'Cycle_Change', 'Sentiment_Proportion']].copy()
 
 # Set the Model
 ols_today_close_model = smf.ols(formula=formula, data=dta).fit()
-print(ols_today_close_model.summary())  # shows R-Squared and Adj. R Squared equals 1; thus model is overfitted
 
-# Update Model with Regularized Fit to prevent over-fitting
+# Print results
+print(ols_today_close_model.summary())
+
+# Update Model with Regularized Fit to prevent over-fitting; alpha and weight values were set.
 olsUpdate_today_close = smf.ols(formula=formula, data=dta).fit_regularized(alpha=10, L1_wt=.6)
-print(olsUpdate_today_close.summary())  # library issue that does not print regularized models
+
+print("Predicting Close value on today's stock using train data up to " + str(train_date_to) + ": ")
 
 olsUpdate_today_close_prediction = olsUpdate_today_close.predict(today_record)
 
+print("Actual Closing Value for: " + str(today_record['Close'].values[0]))
+print("Predicted Closing Value: " + str(round(olsUpdate_today_close_prediction.values[0], 3)))
+
 # Show Updated Model
-#fig = plt.figure(figsize=(12, 8))
-#fig = sm.graphics.plot_partregress_grid(olsUpdate_today_close_prediction, fig=fig)
+fig = plt.figure(figsize=(12, 8))
+fig = sm.graphics.plot_partregress_grid(ols_today_close_model, fig=fig)
+# Added try/except to avoid possible duplicate plot issue with graph output
+try:
+    fig[0]
+except TypeError:
+    fig
 
 # OLS may be the best model; let's tune it
 
 ########################################################################################################################
-# MODELING 4 TODAY #####################################################################################################
+# MODELING 4 TODAY #####################################################################################
 # Prepare formula to predict closing of stock data for today
 
+# Get the highest sentiment and most significant feature against 'Close' for today
 highest_sentiment1_today, significant_value1_today = identify_sig_feature_4_today("Close", "False")
+
+# Update our 'Close' formula with the most significant feature based on today's data
 formula = ('Close ~ Open + High + Low + ' + np.unicode(highest_sentiment1_today))
+
+# Update our training data for 'Close'
 dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                   'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
-# set seed
-np.random.seed(1)
-
+# Get best regularized fit paramters based on most significant sentiment feature for 'Close' and today.
 alpha_val, weight_val = get_fit_regression_params(highest_sentiment1_today, "Close", significant_value1_today)
 
 # Create a Ordinary Least Squares regression model
 lm1_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+
+# Print regression graph
 fig1 = plt.figure(figsize=(12, 8))
 fig1 = sm.graphics.plot_partregress_grid(lm1_today, fig=fig1)
-fig1.savefig('Today_Close_Regression.png')  # Show Partial regression plot of model
+#fig1
+#fig1.savefig('Today_Close_Regression.png')
 
 # Predicts closing value based on train data and model above
 today_close_prediction = lm1_today.predict(today_record)
 
+########################################################################################################################
 # Prepare formula to predict High of stock data for today
+
+# Get the highest sentiment and most significant feature against 'High' for today
 highest_sentiment2_today, significant_value2_today = identify_sig_feature_4_today("High", "False")
+
+# Update our 'High' formula with the most significant feature based on today's data
 formula = ('High ~ Open + Close + Low + ' + np.unicode(highest_sentiment2_today))
+
+# Update our training data for 'High'
 dta = train_data[['High', 'Open', 'Close', 'Low', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                   'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
+# Get best regularized fit paramters based on most significant sentiment feature for 'High' and today.
 alpha_val, weight_val = get_fit_regression_params(highest_sentiment2_today, "High", significant_value2_today)
 
 # Create a Ordinary Least Squares regression model
 lm2_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+
+# Print regression graph
 fig2 = plt.figure(figsize=(12, 8))
 fig2 = sm.graphics.plot_partregress_grid(lm2_today, fig=fig2)
-fig2.savefig('Today_High_Regression.png')  # Show Partial regression plot of model
+#fig2
+#fig2.savefig('Today_High_Regression.png')  # Show Partial regression plot of model
 
 # Predicts high value based on train data and model above
 today_high_prediction = lm2_today.predict(today_record)
 
+########################################################################################################################
 # Prepare formula to predict Low of stock data for today
+
+# Get the highest sentiment and most significant feature against 'Low' for today
 highest_sentiment3_today, significant_value3_today = identify_sig_feature_4_today("Low", "False")
+
+# Update our 'Low' formula with the most significant feature based on today's data
 formula = ('Low ~ Open + Close + High + ' + np.unicode(highest_sentiment3_today))
+
+# Update our training data for 'Low'
 dta = train_data[['Low', 'Open', 'Close', 'High', 'Anger', 'Anticipation',
                   'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                   'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
+# Get best regularized fit paramters based on most significant sentiment feature for 'Low' and today.
 alpha_val, weight_val = get_fit_regression_params(highest_sentiment3_today, "Low", significant_value3_today)
 
 # Create a Ordinary Least Squares regression model
 lm3_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+
+# Print regression graph
 fig3 = plt.figure(figsize=(12, 8))
 fig3 = sm.graphics.plot_partregress_grid(lm3_today, fig=fig3)
-fig3.savefig('Today_Low_Regression.png')  # Show Partial regression plot of model
+#fig3
+#fig3.savefig('Today_Low_Regression.png')  # Show Partial regression plot of model
 
 # Predicts Low value based on train data and model above
 today_low_prediction = lm3_today.predict(today_record)
 
-#
-highest_sentiment11_today, significant_value11_today = identify_sig_feature_4_today("Close", "False")
-# formula = ('Close ~ Open + High + Low + C(Cycle_Change) + ' + np.unicode(highest_sentiment1_today))
-formula = ('Close ~ Open + High + Low + C(False)')
-# formula = ('Close ~ Open + High + Low' )
-dta = train_data[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
-                  'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
-                  'Trust', 'Negative', 'Positive', False, 'Sentiment_Proportion']].copy()
-
-# set seed
-np.random.seed(1)
-
-alpha_val, weight_val = get_fit_regression_params(highest_sentiment11_today, "Close", significant_value11_today)
-
-# Create a Ordinary Least Squares regression model
-lm11_today = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
-fig11 = plt.figure(figsize=(12, 8))
-fig11 = sm.graphics.plot_partregress_grid(lm11_today, fig=fig11)
-fig11.savefig('Today_Close_Regression.png')  # Show Partial regression plot of model
-
-# Predicts closing value based on train data and model above
-today_close_prediction1 = lm11_today.predict(today_record)
-
-print("The Close value for today's stock is estimated to be: " + str(today_close_prediction.iloc[0]))
-print("The High value for today's stock is estimated to be: " + str(today_high_prediction.iloc[0]))
-print("The Low value for today's stock is estimated to be: " + str(today_low_prediction.iloc[0]))
-print("The Close value for today's stock is estimated to be with news cycle: " + str(today_close_prediction1.iloc[0]))
+print("The Close value for today's stock is predicted to be: " + str(today_close_prediction.iloc[0]))
+print("The High value for today's stock is predicted to be: " + str(today_high_prediction.iloc[0]))
+print("The Low value for today's stock is predicted to be: " + str(today_low_prediction.iloc[0]))
 print("")
+print("ACTUAL Close value for today: " + str(today_record['Close'].iloc[0]))
+print("ACTUAL High value for today: " + str(today_record['High'].iloc[0]))
+print("ACTUAL Low value for today: " + str(today_record['Low'].iloc[0]))
 
 ########################################################################################################################
-# MODELING 4 NEXT DAY###################################################################################################
+# MODELING 4 NEXT DAY###################################################################################
 
+# Get the highest sentiment and most significant feature against 'Close' for tomorrow
 highest_sentiment1_tom, significant_value1_tom = identify_sig_feature_4_tomorrow("Close", "False")
+
+# Update our 'Close' formula with the most significant feature based on tomorrow
 formula = ('Close ~ Open + High + Low + ' + np.unicode(highest_sentiment1_tom))
+
+# Update our training data for 'Close'
 dta = train_data_tomorrow[['Close', 'Open', 'High', 'Low', 'Anger', 'Anticipation',
                            'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                            'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
-# Set seed again
-np.random.seed(2)
 
+# Get best regularized fit paramters based on most significant sentiment feature for 'Close' and tomorrow.
 alpha_val, weight_val = get_fit_regression_params(highest_sentiment1_tom, "Close", significant_value1_tom)
 
 # Create a Ordinary Least Squares regression model
 lm1_tom = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+
+# Print regression graph
 fig4 = plt.figure(figsize=(12, 8))
 fig4 = sm.graphics.plot_partregress_grid(lm1_tom, fig=fig4)
-fig4.savefig('Tomorrow_Close_Regression.png')  # Show Partial regression plot of model
+#fig4
+#fig4.savefig('Tomorrow_Close_Regression.png')  # Show Partial regression plot of model
 
 # Predicts closing value based on train data and model above
 close_prediction_tom = lm1_tom.predict(tomorrow_record)
 
-# Prepare formula to predict High of stock data for today
+########################################################################################################################
+# Prepare formula to predict High of stock data for tomorrow
+
+# Get the highest sentiment and most significant feature against 'High' for tomorrow
 highest_sentiment2_tom, significant_value2_tom = identify_sig_feature_4_tomorrow("High", "False")
+
+# Update our 'High' formula with the most significant feature based on tomorrow
 formula = ('High ~ Open + Close + Low + ' + np.unicode(highest_sentiment2_tom))
+
+# Update our training data for 'High'
 dta = train_data_tomorrow[['High', 'Open', 'Close', 'Low', 'Anger', 'Anticipation',
                            'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                            'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
+# Get best regularized fit paramters based on most significant sentiment feature for 'High' and tomorrow.
 alpha_val, weight_val = get_fit_regression_params(highest_sentiment2_tom, "High", significant_value2_tom)
 
 # Create a Ordinary Least Squares regression model
 lm2_tom = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+
+# Print regression graph
 fig5 = plt.figure(figsize=(12, 8))
 fig5 = sm.graphics.plot_partregress_grid(lm2_tom, fig=fig5)
-fig5.savefig('Tomorrow_High_Regression.png')  # Show Partial regression plot of model
+#fig5
+#fig5.savefig('Tomorrow_High_Regression.png')  # Show Partial regression plot of model
 
 # Predicts high value based on train data and model above
 high_prediction_tom = lm2_tom.predict(tomorrow_record)
 
+########################################################################################################################
+# Prepare formula to predict Low of stock data for tomorrow
+
 # Prepare formula to predict Low of stock data for today
 highest_sentiment3_tom, significant_value3_tom = identify_sig_feature_4_tomorrow("Low", "False")
+
+# Update our 'Low' formula with the most significant feature based on tomorrow
 formula = ('Low ~ Open + Close + High + ' + np.unicode(highest_sentiment3_tom))
+
+# Update our training data for 'Low'
 dta = train_data_tomorrow[['Low', 'Open', 'Close', 'High', 'Anger', 'Anticipation',
                            'Disgust', 'Fear', 'Joy', 'Sadness', 'Surprise',
                            'Trust', 'Negative', 'Positive', 'Sentiment_Proportion']].copy()
 
+# Update our training data for 'Low'
 alpha_val, weight_val = get_fit_regression_params(highest_sentiment3_tom, "Low", significant_value3_tom)
 
 # Create a Ordinary Least Squares regression model
 lm3_tom = smf.ols(formula=formula, data=dta).fit_regularized(alpha=alpha_val, L1_wt=weight_val)
+
+# Print regression graph
 fig6 = plt.figure(figsize=(12, 8))
 fig6 = sm.graphics.plot_partregress_grid(lm3_tom, fig=fig6)
-fig6.savefig('Tomorrow_Low_Regression.png')  # Show Partial regression plot of model
+#fig6
+#fig6.savefig('Tomorrow_Low_Regression.png')  # Show Partial regression plot of model
 
 # Predicts Low value based on train data and model above
 low_prediction_tom = lm3_tom.predict(tomorrow_record)
@@ -527,6 +616,8 @@ print("The Close value for tomorrow's stock is estimated to be: " + str(close_pr
 print("The High value for tomorrow's stock is estimated to be: " + str(high_prediction_tom.iloc[0]))
 print("The Low value for tomorrow's stock is estimated to be: " + str(low_prediction_tom.iloc[0]))
 print("")
+
+# Should We Buy or Sell? :)
 
 if float(today_close_prediction.iloc[0]) < float(close_prediction_tom.iloc[0]):
     print("Based on our algorithm, the Closing value for the stock tomorrow will: Increase")
