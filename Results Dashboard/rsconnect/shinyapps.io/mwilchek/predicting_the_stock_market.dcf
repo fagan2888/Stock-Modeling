@@ -1,0 +1,12 @@
+name: predicting_the_stock_market
+title: Predicting the Stock Market
+username:
+account: mwilchek
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 246659
+bundleId: 1131459
+url: https://mwilchek.shinyapps.io/predicting_the_stock_market/
+when: 1513131087.75125
+asMultiple: FALSE
+asStatic: FALSE
